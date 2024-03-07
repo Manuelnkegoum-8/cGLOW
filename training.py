@@ -73,7 +73,7 @@ if __name__=='__main__':
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,betas=config.betas)
     train_loader = DataLoader(trainingset,batch_size=args.batch_size,shuffle=True)
-    test_loader = DataLoader(testset,batch_size=args.batch_size,shuffle=True)
+    test_loader = DataLoader(testset,batch_size=args.batch_size,shuffle=False)
 
     print("[INFO] Training check logs for detailed results")
     trainer = Trainer(model,trainloader=train_loader,
