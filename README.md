@@ -1,4 +1,4 @@
-# cGLOW: Conditional Generative Flows 🌈
+# cGLOW: Conditional Generative Flows  🌟
 [![pytorch version](https://img.shields.io/badge/pytorch-2.1.2-yellow.svg)](https://pypi.org/project/torch/2.1.2-/)
 [![torchvision version](https://img.shields.io/badge/torchvision-0.16.2-yellow.svg)](https://pypi.org/project/torchvision/0.16.2-/)
 [![numpy version](https://img.shields.io/badge/numpy-1.26.4-blue.svg)](https://pypi.org/project/numpy/1.26.4/)
@@ -60,7 +60,7 @@ This code is used for the experiments of binary segmentation on the [Retina Bloo
 ## Acknowledgements 🙏 
 
 - Immense gratitude to the original authors of the Glow model and the vibrant community around generative models, whose work paved the way for advancements like cGLOW.
-- Code was inspired from [openai](https://github.com/openai/glow) 
+- Some parts of the code was inspired from [openai](https://github.com/openai/glow)  and [ameroyer](https://github.com/ameroyer/glow_jax)
 
 ## Authors 🧑‍💻
 - [Manuel NKEGOUM](https://github.com/Manuelnkegoum-8)
