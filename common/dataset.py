@@ -6,25 +6,6 @@ from torch.utils import data
 import torchvision.transforms as transforms
 import math
 
-def my_preprocess(image,num_bits=2,training=True):
-    # Discretize to the given number of bits
-    shape = image.size()
-    image = image*255.
-    if num_bits < 8:
-        image = torch.floor(image / 2 ** (8 - num_bits))
-    num_bins = 2 ** num_bits
-    image = image / num_bins - 0.5
-    if training:
-        image = image + torch.rand(shape,device=image.device)/num_bins
-    return image
-
-
-def my_postprocess(x, num_bits):
-    """Map [-0.5, 0.5] quantized images to uint space"""
-    num_bins = 2 ** num_bits
-    x = torch.floor((x + 0.5) * num_bins)
-    x *= 256. / num_bins
-    return torch.clip(x, 0, 255).to(torch.uint8)
 
 
 class CustomDataset(data.Dataset):

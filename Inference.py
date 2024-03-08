@@ -33,7 +33,8 @@ class CFG:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device("cpu")
+cuda = torch.cuda.is_available()
+device = torch.device('cuda') if cuda else torch.device("cpu")
 size = args.x_size
 
 config = CFG(
@@ -57,7 +58,8 @@ if __name__=="__main__":
 
     model = cGlowModel(config)
     model = model.to(device)
-    state = load_state( args.model_path,True)
+    state = load_state( args.model_path,cuda)
     model.load_state_dict(state)
     infer = Inference(model,test_loader,config)
-    infer.sampled_based_prediction(10)
+    Iou = infer.sampled_based_prediction(10)
+    print("IoU : = {:.3f}".format(Iou))
