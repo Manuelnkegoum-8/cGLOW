@@ -98,24 +98,21 @@ class Split2d(nn.Module):
     def __init__(self, num_channels):
         super().__init__()
 
-        self.conv = nn.Sequential(
-           Conv2dZeros(num_channels // 2, num_channels),
-            nn.Tanh()
-        )
+        self.conv = Conv2dZeros(num_channels // 2, num_channels)
 
     def split2d_prior(self, z):
         h = self.conv(z)
         return split_feature(h, "cross")
 
-    def forward(self, input, logdet=0., reverse=False, eps_std=None):
+    def forward(self, inputs, logdet=0., reverse=False, eps_std=None):
         if not reverse:
-            z1, z2 = split_feature(input, "split")
+            z1, z2 = split_feature(inputs, "split")
             mean, logs = self.split2d_prior(z1)
             logdet = GaussianDiag.logp(mean, logs, z2) + logdet
 
             return z1, logdet
         else:
-            z1 = input
+            z1 = inputs
             mean, logs = self.split2d_prior(z1)
             z2 = GaussianDiag.sample(mean, logs, eps_std)
             z = torch.cat((z1, z2), dim=1)

@@ -34,7 +34,7 @@ def split_feature(tensor, type="split"):
     """
     C = tensor.size(1)
     if type == "split":
-        return tensor[:, :C // 2, ...], tensor[:, C // 2:, ...]
+        return torch.chunk(tensor,2,1)
     elif type == "cross":
         return tensor[:, 0::2, ...], tensor[:, 1::2, ...]
 

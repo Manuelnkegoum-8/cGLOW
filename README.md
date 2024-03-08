@@ -60,7 +60,7 @@ This code is used for the experiments of binary segmentation on the [Retina Bloo
 ## Acknowledgements 🙏 
 
 - Immense gratitude to the original authors of the Glow model and the vibrant community around generative models, whose work paved the way for advancements like cGLOW.
-- Some parts of the code was inspired from [openai](https://github.com/openai/glow)  and [ameroyer](https://github.com/ameroyer/glow_jax)
+- Some parts of the code was inspired from [y0ast](https://github.com/y0ast/Glow-PyTorch/)  and [ameroyer](https://github.com/ameroyer/glow_jax)
 
 ## Authors 🧑‍💻
 - [Manuel NKEGOUM](https://github.com/Manuelnkegoum-8)

@@ -31,7 +31,6 @@ class cActnorm(nn.Module):
             LinearLayer(hidden_size,hidden_size,"zeros"),
             nn.ReLU(),
             LinearLayer(hidden_size,y_channels*2,"normal"),
-            nn.Tanh()
         )    
 
     def forward(self, x,y,logdet=0., reverse = False):
@@ -76,7 +75,6 @@ class cInvertibleConv(nn.Module):
             LinearLayer(hidden_size,hidden_size,"zeros"),
             nn.ReLU(),
             LinearLayer(hidden_size,y_channels**2,"normal"),
-            nn.Tanh(),
         )     
 
 
@@ -112,14 +110,12 @@ class cAffine(nn.Module):
                                         Rconv(in_channels=16,out_channels=self.d,stride=stride),
                                         nn.ReLU(),
                                         nn.Conv2d(in_channels=self.d,out_channels=self.d,kernel_size=3,padding=1),
-                                        nn.ReLU()
                                         ) 
         self.conv2 = nn.Sequential(nn.Conv2d(in_channels=2*self.d,out_channels=256,kernel_size=3,padding=1),
                                         nn.ReLU(),
                                         nn.Conv2d(in_channels=256,out_channels=256,kernel_size=1),
                                         nn.ReLU(),
                                         ZeroConv2d(256,2*self.d),
-                                        nn.Tanh(),
                                         ) 
 
     def forward(self, x,y,logdet=0.,reverse = False):
