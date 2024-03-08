@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define variables
-x_size=128
-y_size=128
+x_size=64
+y_size=64
 hidden_channels=64
 hidden_size=128
 flow_depth=8
