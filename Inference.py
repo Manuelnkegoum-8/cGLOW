@@ -61,5 +61,5 @@ if __name__=="__main__":
     state = load_state( args.model_path,cuda)
     model.load_state_dict(state)
     infer = Inference(model,test_loader,config)
-    Iou = infer.sampled_based_prediction(10)
+    Iou = infer.sampled_based_prediction(20)
     print("IoU : = {:.3f}".format(Iou))
