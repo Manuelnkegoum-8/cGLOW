@@ -41,14 +41,15 @@ class CustomDataset(data.Dataset):
         name = self.names[index]
         img_path = name["img"]
         lbl_path = name["mask"]
-        transform = transforms.Compose([transforms.Resize((self.size,self.size)), transforms.ToTensor()])
+        transform_input = transforms.Compose([transforms.Resize((self.size,self.size)), transforms.ToTensor()])
+        transform_mask = transforms.Compose([transforms.Resize((self.size,self.size)), transforms.PILToTensor()])
 
         # img
         img = Image.open(img_path).convert("RGB")
-        img = transform(img)
+        img = transform_input(img)
         # lbl
         lbl = Image.open(lbl_path).convert("L")
-        lbl = transform(lbl)
+        lbl = transform_mask(lbl)
         if self.n_c == 2: # binary segmentation
             lbl = lbl.repeat(3,1,1) #make it three channels
         return {"x":img, "y":lbl}

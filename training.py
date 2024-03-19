@@ -63,10 +63,9 @@ config = CFG(
 if __name__=='__main__':
     print("[INFO] Loading data")
     trainingset = CustomDataset( dir = args.dataset_root, size=size, n_classes = args.num_classes, portion="train")
-    testset = CustomDataset( dir = args.dataset_root, size=size, n_classes =  args.num_classes, portion="test")
+    testset = CustomDataset( dir = args.dataset_root, size=size, n_classes =  args.num_classes, portion="val")
 
     n_epochs =  math.ceil((args.num_steps * args.batch_size) / len(trainingset))
-    print(config.betas)
     print("[INFO] Initializing cGlow")
     model = cGlowModel(config)
     model = model.to(device)
@@ -83,4 +82,4 @@ if __name__=='__main__':
                     
     trainer.train(n_epochs)
     print("[INFO] End of trainin,saving model")
-    torch.save(model.state_dict(), 'my_model.pth')
+    torch.save(model.state_dict(), 'my_model_2.pth')

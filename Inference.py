@@ -53,7 +53,7 @@ config = CFG(
      device = device
 )
 if __name__=="__main__":
-    testset = CustomDataset( dir = args.dataset_root, size=size, n_classes =  args.num_classes, portion="test")
+    testset = CustomDataset( dir = args.dataset_root, size=size, n_classes =  args.num_classes, portion="val")
     test_loader = DataLoader(testset,batch_size=args.batch_size,shuffle=False)
 
     model = cGlowModel(config)

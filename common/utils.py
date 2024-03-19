@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 def my_preprocess(image,num_bits=2,training=True):
     # Discretize to the given number of bits
     shape = image.size()
-    image = image*255.
+    #image = image*255.
     if num_bits < 8:
         image = torch.floor(image / 2 ** (8 - num_bits))
     num_bins = 2 ** num_bits
@@ -115,6 +115,8 @@ class Trainer(object):
             self.writer.add_scalar('Loss/train', avg_loss, global_step=epoch)
             self.writer.add_scalar('Loss/val', val_loss, global_step=epoch)
             self.writer.add_scalar('Iou', iou, global_step=epoch)
+            if epoch%10==0:
+                torch.save(self.model.state_dict(), 'my_model_2.pth')
             #print("train loss := {} , val_loss:= {}".format(avg_loss,val_loss))
         self.writer.close()
 
@@ -154,7 +156,7 @@ class Trainer(object):
             sample = torch.stack(sample_list)
             sample = torch.mean(sample, dim=0, keepdim=False)
             sample = my_postprocess(sample,self.y_bins)
-            iou = compute_iou((y*255.).to(torch.uint8)[:,0,:,:], sample[:,0,:,:])
+            iou = compute_iou(y[:,0,:,:], sample[:,0,:,:])
             avg_iou+= iou*x.size(0)
             n+= x.size(0)
         return avg_iou/n
@@ -197,7 +199,7 @@ class Inference(object):
             sample = my_postprocess(sample,self.y_bins)
 
 
-            iou = compute_iou((y*255.).to(torch.uint8)[:,0,:,:], sample[:,0,:,:])
+            iou = compute_iou(y[:,0,:,:], sample[:,0,:,:])
             avg_iou+= iou*x.size(0)
             n+= x.size(0)
             # save trues and preds
@@ -205,7 +207,8 @@ class Inference(object):
             for i in range(sample.size(0)):
                 true_img = y[i].detach().cpu()
                 pred_img = sample[i].detach().cpu()
-                row = torch.cat((x[i].cpu(), true_img, pred_img), dim=1)
+                rgb_img = x[i].cpu()
+                row = torch.cat((rgb_img, true_img/true_img.max(), pred_img/pred_img.max()), dim=1)
                 if output is None:
                     output = row
                 else:

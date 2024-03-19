@@ -5,15 +5,15 @@ x_size=128
 y_size=128
 hidden_channels=64
 hidden_size=128
-flow_depth=8
+flow_depth=10
 num_levels=3
 learn_top=True
 dataset_root="Data"
 num_classes=2
-y_bits=2.0
+y_bits=2
 learning_rate=0.0002
-num_steps=10
-batch_size=2
+num_steps=50000
+batch_size=4
 
 
 # Run the Python script with the specified variables
