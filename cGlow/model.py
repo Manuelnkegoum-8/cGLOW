@@ -26,11 +26,12 @@ class cActnorm(nn.Module):
         )
         flat = int(hidden_channels*(H*W)//(stride**6))
         self.fc = nn.Sequential(
-            LinearLayer(flat,hidden_size,"zeros"),
+            LinearLayer(flat,hidden_size,"zeros"), # need to be zeros
             nn.ReLU(),
-            LinearLayer(hidden_size,hidden_size,"zeros"),
+            LinearLayer(hidden_size,hidden_size,"zeros"), # need to be zeros
             nn.ReLU(),
-            LinearLayer(hidden_size,y_channels*2,"normal"),
+            LinearLayer(hidden_size,y_channels*2,"normal"), # cannot be to zero initialization because Glow use s and b as random normal
+            nn.Tanh(),
         )    
 
     def forward(self, x,y,logdet=0., reverse = False):
@@ -75,6 +76,7 @@ class cInvertibleConv(nn.Module):
             LinearLayer(hidden_size,hidden_size,"zeros"),
             nn.ReLU(),
             LinearLayer(hidden_size,y_channels**2,"normal"),
+            nn.Tanh(),
         )     
 
 
@@ -84,7 +86,7 @@ class cInvertibleConv(nn.Module):
         dlogdet = torch.slogdet(matrix)[1] * dimensions
         if reverse:
             logdet = logdet - dlogdet
-            matrix = torch.inverse(matrix)
+            matrix = torch.inverse(matrix.double()).float()
             
         else:
             logdet = logdet + dlogdet
@@ -110,6 +112,7 @@ class cAffine(nn.Module):
                                         Rconv(in_channels=16,out_channels=self.d,stride=stride),
                                         nn.ReLU(),
                                         nn.Conv2d(in_channels=self.d,out_channels=self.d,kernel_size=3,padding=1),
+                                        nn.ReLU()
                                         ) 
         self.conv2 = nn.Sequential(nn.Conv2d(in_channels=2*self.d,out_channels=256,kernel_size=3,padding=1),
                                         nn.ReLU(),

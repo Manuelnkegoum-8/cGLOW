@@ -13,6 +13,8 @@ class Rconv(nn.Conv2d):
     def __init__(self,in_channels,out_channels,stride):
         ks = stride
         super().__init__(in_channels=in_channels,out_channels=out_channels,kernel_size=ks,stride=stride)
+        nn.init.zeros_(self.weight)
+        nn.init.zeros_(self.bias)
 
 class LinearLayer(nn.Linear):
     def __init__(self, in_channels, out_channels, initialization='zeros'):
