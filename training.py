@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-import math
+import math,time
 from cGlow.modules import *
 from cGlow.model import *
 from common.utils import *
@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 import argparse
 from colorama import Fore, Style
 
-def printf(text='='*80):
+def printf(text='='*100):
     for char in text:
         print(Fore.CYAN + char, end="", flush=True)
         time.sleep(0.001)
@@ -69,6 +69,7 @@ config = CFG(
      out_root = 'evolution',
      num_labels = args.num_classes,
      grad_clip = args.grad_clip,
+     grad_norm = args.grad_norm,
      checkpoint = args.checkpoint,
      device = device
 )
