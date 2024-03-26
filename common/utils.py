@@ -182,7 +182,7 @@ class Trainer(object):
                 save_image(output, os.path.join(self.out_root, "step_{}.png".format(epoch)))
                 self.writer.add_scalar('Iou', iou, global_step=epoch)
         img, *imgs = [Image.open(f) for f in sorted(glob.glob(self.fp_in),key=lambda x: int(x.split('_')[1].split('.')[0]))]
-        img.save(fp=self.fp_out, format='GIF', append_images=imgs,save_all=True, duration=200, loop=0)
+        img.save(fp=self.fp_out, format='GIF', append_images=imgs,save_all=True, duration=500, loop=0)
 
 
     @torch.no_grad()
