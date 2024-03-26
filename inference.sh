@@ -5,14 +5,14 @@ x_size=128
 y_size=128
 hidden_channels=64
 hidden_size=128
-flow_depth=10
+flow_depth=8
 num_levels=3
 learn_top=True
 dataset_root="Data"
 num_classes=2
-y_bits=2
+y_bits=1
 batch_size=2
-model_path="my_model_2.pth"
+model_path="cglow.pth"
 
 # Run the Python script with the specified variables
 python Inference.py \

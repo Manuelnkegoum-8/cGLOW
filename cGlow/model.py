@@ -5,7 +5,7 @@ import torch.nn.init as init
 import numpy as np
 import torch.nn.functional as F
 from .modules import *
-
+from common.utils import * 
 
 class cActnorm(nn.Module):
     """
@@ -26,12 +26,12 @@ class cActnorm(nn.Module):
         )
         flat = int(hidden_channels*(H*W)//(stride**6))
         self.fc = nn.Sequential(
-            LinearLayer(flat,hidden_size,"zeros"), # need to be zeros
+            LinearLayer(flat,hidden_size,"zeros"),
             nn.ReLU(),
-            LinearLayer(hidden_size,hidden_size,"zeros"), # need to be zeros
+            LinearLayer(hidden_size,hidden_size,"zeros"),
             nn.ReLU(),
-            LinearLayer(hidden_size,y_channels*2,"normal"), # cannot be to zero initialization because Glow use s and b as random normal
-            nn.Tanh(),
+            LinearLayer(hidden_size,y_channels*2,"zeros"),
+            nn.Tanh()
         )    
 
     def forward(self, x,y,logdet=0., reverse = False):
@@ -48,7 +48,7 @@ class cActnorm(nn.Module):
             # latent to observed u -> v
             v = y*torch.exp(log_s) + b
             dlogdet = dimentions * torch.sum(log_s, dim=(1,2,3))
-            
+
         logdet = logdet + dlogdet
         return v,logdet
 
@@ -86,8 +86,8 @@ class cInvertibleConv(nn.Module):
         dlogdet = torch.slogdet(matrix)[1] * dimensions
         if reverse:
             logdet = logdet - dlogdet
-            matrix = torch.inverse(matrix.double()).float()
-            
+            matrix = torch.inverse(matrix)
+
         else:
             logdet = logdet + dlogdet
         matrix = matrix.unsqueeze(-1).unsqueeze(-1)
@@ -107,18 +107,19 @@ class cAffine(nn.Module):
         C,H,W = in_size
         stride = H//y_size[1]
         self.d = y_size[0]
-        self.convolutions = nn.Sequential(nn.Conv2d(in_channels=C,out_channels=hidden_channels,kernel_size=3,padding=1),
+        self.convolutions = nn.Sequential(Conv2d(in_channels=C,out_channels=hidden_channels),
                                         nn.ReLU(),
                                         Rconv(in_channels=16,out_channels=self.d,stride=stride),
                                         nn.ReLU(),
-                                        nn.Conv2d(in_channels=self.d,out_channels=self.d,kernel_size=3,padding=1),
+                                        Conv2d(in_channels=self.d,out_channels=self.d),
                                         nn.ReLU()
                                         ) 
-        self.conv2 = nn.Sequential(nn.Conv2d(in_channels=2*self.d,out_channels=256,kernel_size=3,padding=1),
+        self.conv2 = nn.Sequential(Conv2d(in_channels=2*self.d,out_channels=256),
                                         nn.ReLU(),
-                                        nn.Conv2d(in_channels=256,out_channels=256,kernel_size=1),
+                                        Conv2d(in_channels=256,out_channels=256,kernel_size=[1,1]),
                                         nn.ReLU(),
                                         ZeroConv2d(256,2*self.d),
+                                        nn.Tanh(),
                                         ) 
 
     def forward(self, x,y,logdet=0.,reverse = False):
@@ -126,7 +127,7 @@ class cAffine(nn.Module):
         xr = self.convolutions(x)
         h = torch.cat((xr,y_in),dim=1)
         out = self.conv2(h)
-        log_s, b = out.chunk(2, 1)
+        log_s, b = split_feature(out, "cross")
         sigma = torch.sigmoid(log_s + 2. )
         if reverse:
             tmp = (y_mod-b)/(sigma+1e-8)
@@ -134,8 +135,8 @@ class cAffine(nn.Module):
         else:
             tmp = sigma*y_mod + b
             logdet = torch.sum(torch.log(sigma), dim=(1, 2, 3)) + logdet 
-            
-        
+
+
         out = torch.cat((y_in,tmp),dim=1)
         return out,logdet
 
@@ -241,7 +242,7 @@ class cGlowModel(nn.Module):
                                      self.flow.output_shapes[-1][1],
                                      self.flow.output_shapes[-1][2],
                                      self.flow.output_shapes[-1][3]])))
-        self.n_bins = args.y_bins
+        self.n_bins = 2**args.y_bits
 
     def prior(self):
         if self.learn_top:

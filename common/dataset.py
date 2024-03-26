@@ -6,14 +6,11 @@ from torch.utils import data
 import torchvision.transforms as transforms
 import math
 
-
-
 class CustomDataset(data.Dataset):
 
-    def __init__(self, dir, size, n_classes, portion="train"):
+    def __init__(self, dir, size, portion="train"):
         self.dir = dir
         self.names = self.read_names(dir, portion)
-        self.n_c = n_classes
         self.size = size
 
     def read_names(self, dir, portion):
@@ -41,19 +38,13 @@ class CustomDataset(data.Dataset):
         name = self.names[index]
         img_path = name["img"]
         lbl_path = name["mask"]
-        transform_input = transforms.Compose([transforms.Resize((self.size,self.size)), transforms.ToTensor()])
-        transform_mask = transforms.Compose([transforms.Resize((self.size,self.size)), transforms.PILToTensor()])
+        transform = transforms.Compose([transforms.Resize((self.size,self.size)), transforms.ToTensor()])
 
         # img
         img = Image.open(img_path).convert("RGB")
-        img = transform_input(img)
+        img = transform(img)
         # lbl
         lbl = Image.open(lbl_path).convert("L")
-        lbl = transform_mask(lbl)
-        if self.n_c == 2: # binary segmentation
-            lbl = lbl.repeat(3,1,1) #make it three channels
+        lbl = transform(lbl)
+        lbl = lbl.repeat(3,1,1) #make it three channels
         return {"x":img, "y":lbl}
-
-
-
-0

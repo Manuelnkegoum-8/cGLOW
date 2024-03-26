@@ -2,35 +2,43 @@ import os
 import torch
 import numpy as np
 from tqdm import trange
-from .dataset import *
 from torchvision.utils import save_image
 from torch.utils.tensorboard import SummaryWriter
+import torchvision.transforms as transforms
+import skimage.color
+import skimage.util
+import skimage.io
 
-
-def my_preprocess(image,num_bits=2,training=True):
-    # Discretize to the given number of bits
-    shape = image.size()
-    #image = image*255.
-    if num_bits < 8:
-        image = torch.floor(image / 2 ** (8 - num_bits))
-    num_bins = 2 ** num_bits
-    image = image / num_bins - 0.5
-    if training:
-        image = image + torch.rand(shape,device=image.device)/num_bins
+def my_preprocess(image):
+    image = image - 0.5
+    image = image + torch.zeros_like(image).uniform_(-0.5,0.5)
     return image
 
+def my_postprocess(image):
+    image = image + 0.5
+    return image
 
-def my_postprocess(x, num_bits):
-    """Map [-0.5, 0.5] quantized images to uint space"""
-    num_bins = 2 ** num_bits
-    x = torch.floor((x + 0.5) * num_bins)
-    x *= 256. / num_bins
-    return torch.clip(x, 0, 255).to(torch.uint8)
+def convert_to_img(y):
+    C = y.size(1)
+    transform = transforms.ToTensor()
+    colors = np.array([[0,0,0],[255,255,255]])
+    seg = torch.mean(y, dim=1, keepdim=False).cpu().numpy()
+    seg = np.nan_to_num(seg)
+    seg = np.clip(np.round(seg),a_min=0, a_max=1)
+    B,C,H,W = y.size()
+    imgs = list()
+    for i in range(B):
+        label_i = skimage.color.label2rgb(seg[i], bg_label=0, bg_color=(0, 0, 0), colors=[(1.,1.,1.)])
+        label_i = skimage.util.img_as_ubyte(label_i)
+        imgs.append(transform(label_i))
+    return imgs, seg
 
 
 def split_feature(tensor, type="split"):
     """
     type = ["split", "cross"]
+    cross for alternative pattern
+    split for chunk
     """
     C = tensor.size(1)
     if type == "split":
@@ -44,13 +52,12 @@ def save_model(model, optim, scheduler, dir, iteration):
     state = {}
     state["iteration"] = iteration
     state["modelname"] = model.__class__.__name__
-    state["model"] = model.state_dict()
+    state["model_state_dict"] = model.state_dict()
     state["optim"] = optim.state_dict()
     if scheduler is not None:
         state["scheduler"] = scheduler.state_dict()
     else:
         state["scheduler"] = None
-
     torch.save(state, path)
 
 
@@ -67,58 +74,112 @@ def load_state(path, cuda):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-def compute_iou(masks1, masks2):
-    # Calculate IoU for each pair of masks in the batch
-    ious = []
-    for i in range(masks1.shape[0]):
-        intersection = (masks1[i] & masks2[i]).sum()
-        union = (masks1[i] | masks2[i]).sum()
-        iou = (intersection + 1e-10) / (union + 1e-10)
-        ious.append(iou.item())
-    # Average IoU across all pairs of masks in the batch
-    return sum(ious) / len(ious)
+
+
+
+def sample_based(model,x,n_samples):
+    sample_list = list()
+    for i in range(0, n_samples):
+        y_sample,_ = model(x + torch.zeros_like(x).uniform_(0,1/256.), reverse=True)
+        sample_list.append(y_sample)
+        sample = torch.stack(sample_list)
+        sample = torch.mean(sample, dim=0, keepdim=False)
+    return sample
+
+@torch.no_grad()
+def prediction(model,device,loader,n_samples):
+    all_samples = list()
+    all_masks = list()
+    all_images = list()
+    for i_batch, data in enumerate(loader):
+            x, y = data['x'],data['y']
+            x = x.to(device) # true img
+            y = y.to(device) # mask
+            y = my_preprocess(y)
+            sample = sample_based(model,x,n_samples)
+
+            all_samples.append(sample)
+            all_masks.append(y)
+            all_images.append(x)
+
+    all_samples = torch.stack(all_samples,dim=0)
+    all_masks = torch.stack(all_masks,dim=0)
+    all_images = torch.stack(all_images,dim=0)
+
+    all_samples = my_postprocess(all_samples)
+    all_samples,true_seg = convert_to_img(all_samples)
+    all_masks = my_postprocess(all_maks)
+    all_masks,pred_seg = convert_to_img(all_maks)
+
+    iou = compute_iou(pred_seg,true_seg)
+    # save trues and preds
+    output = None
+    for i in range(len(all_samples)):
+        true_img = all_images[i].detach().cpu()
+        pred_mask = all_samples[i].detach().cpu()
+        true_mask = all_masks[i].detach().cpu()
+        row = torch.cat((true_img, true_mask, pred_mask), dim=1)
+        if output is None:
+            output = row
+        else:
+            output = torch.cat((output,row), dim=2)
+    return output,iou
 
 class Trainer(object):
-    def __init__(self,model,trainloader,valloader,optimizer,args):
+    def __init__(self,model,train_loader,val_loader,optimizer,scheduler,args):
         self.model = model
-        self.train_loader = trainloader
-        self.val_loader = valloader
+        self.train_loader = train_loader
+        self.val_loader = val_loader
         self.optim = optimizer
         self.device = args.device
-        self.y_bins = args.y_bins
-
+        self.y_bits = args.y_bits
+        self.out_root = args.out_root
+        self.scheduler = scheduler
         self.writer = SummaryWriter()
+        self.fp_in = os.path.join(self.out_root,"step_*.png")
+        self.p_out = "sample_evolution.gif"
+
     def train(self,n_epochs):
         for epoch in trange(n_epochs):
             avg_loss = 0.
             n = 0.
+            self.model.train()
             for data in self.train_loader:
                 x, y = data['x'],data['y']
                 x = x.to(self.device)
                 y = y.to(self.device)
-
-                y = my_preprocess(y,self.y_bins,training=True)
+                y = my_preprocess(y,self.y_bits,training=True)
                 # forward
-                z, nll = self.model(x, y)
+                z, nll = self.model(x + torch.zeros_like(x).uniform_(0,1/256.), y)
                 # loss
                 loss = torch.mean(nll)
                 avg_loss = avg_loss + loss.item()*x.size(0)
                 # backward
                 self.optim.zero_grad()
                 loss.backward()
+                if args.grad_clip >0:
+                    torch.nn.utils.clip_grad_value_(self.model.parameters(),args.grad_clip)
+                if args.grad_norm >0:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(),args.grad_norm)
                 self.optim.step()
                 n+= x.size(0)
             avg_loss = avg_loss / n
 
             val_loss = self.validate()
-            iou = self.sampled_based_prediction(10)
             self.writer.add_scalar('Loss/train', avg_loss, global_step=epoch)
             self.writer.add_scalar('Loss/val', val_loss, global_step=epoch)
-            self.writer.add_scalar('Iou', iou, global_step=epoch)
-            if epoch%10==0:
-                torch.save(self.model.state_dict(), 'my_model_2.pth')
-            #print("train loss := {} , val_loss:= {}".format(avg_loss,val_loss))
-        self.writer.close()
+
+            if self.scheduler is not None:
+                scheduler.step()
+
+            if epoch%args.checkpoint==0:
+                save_model(self.model, self.optim, self.scheduler,'checkpoints/{}-cglow.pth'.format(epoch), epoch)
+                output,iou = prediction(self.model,self.device,self.val_loader,10)
+                save_image(output, os.path.join(self.out_root, "step-{}.png".format(epoch)))
+                self.writer.add_scalar('Iou', iou, global_step=epoch)
+        img, *imgs = [Image.open(f) for f in sorted(glob.glob(self.fp_in))]
+        img.save(fp=self.fp_out, format='GIF', append_images=imgs,save_all=True, duration=20, loop=0)
+
 
     @torch.no_grad()
     def validate(self):
@@ -129,9 +190,9 @@ class Trainer(object):
                 x, y = data['x'],data['y']
                 x = x.to(self.device)
                 y = y.to(self.device)
-                y = my_preprocess(y,self.y_bins,training=False)
+                y = my_preprocess(y,self.y_bits,training=True)
                 # forward
-                z, nll = self.model(x, y)
+                z, nll = self.model(x + torch.zeros_like(x).uniform_(0,1/256.), y)
                 # loss
                 loss = torch.mean(nll)
                 avg_loss = avg_loss + loss.item()*x.size(0)
@@ -139,27 +200,9 @@ class Trainer(object):
         avg_loss = avg_loss / n
         return avg_loss
 
-    @torch.no_grad()
-    def sampled_based_prediction(self, n_samples):
-        self.model.eval()
-        avg_iou = 0.
-        n = 0
-        for i_batch, data in enumerate(self.val_loader):     
-            x, y = data['x'],data['y']
-            x = x.to(self.device) # true img
-            y = y.to(self.device) # mask
-            sample_list = list()
-            nll_list = list()
-            for i in range(0, n_samples):
-                y_sample,_ = self.model(x, reverse=True)
-                sample_list.append(y_sample)
-            sample = torch.stack(sample_list)
-            sample = torch.mean(sample, dim=0, keepdim=False)
-            sample = my_postprocess(sample,self.y_bins)
-            iou = compute_iou(y[:,0,:,:], sample[:,0,:,:])
-            avg_iou+= iou*x.size(0)
-            n+= x.size(0)
-        return avg_iou/n
+    
+        
+
 
 class Inference(object):
 
@@ -171,7 +214,6 @@ class Inference(object):
             os.makedirs(self.out_root)
         # model
         self.model = model
-        self.y_bins = args.y_bins
         self.num_labels = args.num_labels
         self.device = args.device
         self.dataloader = dataloader
@@ -179,39 +221,6 @@ class Inference(object):
 
     @torch.no_grad()
     def sampled_based_prediction(self, n_samples):
-        metrics = []
-        avg_iou = 0.
-        n = 0
-        for i_batch, data in enumerate(self.dataloader):
-            
-            x, y = data['x'],data['y']
-            x = x.to(self.device) # true img
-            y = y.to(self.device) # mask
-
-            sample_list = list()
-            nll_list = list()
-            for i in range(0, n_samples):
-                y_sample,_ = self.model(x, reverse=True)
-                sample_list.append(y_sample)
-
-            sample = torch.stack(sample_list)
-            sample = torch.mean(sample, dim=0, keepdim=False)
-            sample = my_postprocess(sample,self.y_bins)
-
-
-            iou = compute_iou(y[:,0,:,:], sample[:,0,:,:])
-            avg_iou+= iou*x.size(0)
-            n+= x.size(0)
-            # save trues and preds
-            output = None
-            for i in range(sample.size(0)):
-                true_img = y[i].detach().cpu()
-                pred_img = sample[i].detach().cpu()
-                rgb_img = x[i].cpu()
-                row = torch.cat((rgb_img, true_img/true_img.max(), pred_img/pred_img.max()), dim=1)
-                if output is None:
-                    output = row
-                else:
-                    output = torch.cat((output,row), dim=2)
-            save_image(output, os.path.join(self.out_root, "trues-{}.png".format(i_batch)))
-        return avg_iou/n
+        output,iou = prediction(self.model,self.device,self.dataloader,n_samples)
+        save_image(output, os.path.join(self.out_root, "trues.png"))
+        return iou

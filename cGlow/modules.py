@@ -13,8 +13,6 @@ class Rconv(nn.Conv2d):
     def __init__(self,in_channels,out_channels,stride):
         ks = stride
         super().__init__(in_channels=in_channels,out_channels=out_channels,kernel_size=ks,stride=stride)
-        nn.init.zeros_(self.weight)
-        nn.init.zeros_(self.bias)
 
 class LinearLayer(nn.Linear):
     def __init__(self, in_channels, out_channels, initialization='zeros'):
@@ -46,12 +44,13 @@ class ZeroConv2d(nn.Module):
 
         return out
 
-class Conv2dZeros(nn.Conv2d):
+class Conv2d(nn.Conv2d):
 
-    def __init__(self, in_channel, out_channel, kernel_size=[3,3], stride=[1,1]):
+    def __init__(self, in_channels, out_channels, kernel_size=[3,3], stride=[1,1]):
         padding = (kernel_size[0] - 1) // 2
-        super().__init__(in_channels=in_channel, out_channels=out_channel, kernel_size=kernel_size, stride=stride, padding=padding)
-        self.weight.data.normal_(mean=0.0, std=0.1)
+        super().__init__(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
+        self.weight.data.normal_(mean=0.0, std=0.05)
+        self.bias.data.zero_()
 
 
 
@@ -100,21 +99,21 @@ class Split2d(nn.Module):
     def __init__(self, num_channels):
         super().__init__()
 
-        self.conv = Conv2dZeros(num_channels // 2, num_channels)
+        self.conv =  nn.Sequential(ZeroConv2d(num_channels // 2, num_channels),nn.Tanh())
 
     def split2d_prior(self, z):
         h = self.conv(z)
         return split_feature(h, "cross")
 
-    def forward(self, inputs, logdet=0., reverse=False, eps_std=None):
+    def forward(self, input, logdet=0., reverse=False, eps_std=None):
         if not reverse:
-            z1, z2 = split_feature(inputs, "split")
+            z1, z2 = split_feature(input, "split")
             mean, logs = self.split2d_prior(z1)
             logdet = GaussianDiag.logp(mean, logs, z2) + logdet
 
             return z1, logdet
         else:
-            z1 = inputs
+            z1 = input
             mean, logs = self.split2d_prior(z1)
             z2 = GaussianDiag.sample(mean, logs, eps_std)
             z = torch.cat((z1, z2), dim=1)
