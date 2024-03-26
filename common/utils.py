@@ -22,7 +22,6 @@ def my_postprocess(x):
     transform = transforms.ToTensor()
     num_bins = 2 ** 8
     x = torch.floor((x + 0.5) * num_bins)
-    #x *= 256. / num_bins
     x = torch.clip(x, 0, 255)/255.
     return x
     
@@ -42,7 +41,7 @@ def split_feature(tensor, type="split"):
 
 
 def save_model(model, optim, scheduler, dir, iteration):
-    path = os.path.join(dir, "cglow_{}.pth.tar".format(iteration))
+    path = os.path.join(dir, "cglow.pth.tar")
     state = {}
     state["iteration"] = iteration
     state["modelname"] = model.__class__.__name__

@@ -53,9 +53,8 @@ To dive into the transformative world of cGLOW, begin by setting up your environ
 ## Results 📊
 
 This code is used for the experiments of binary segmentation on the [Retina Blood Vessel](https://www.kaggle.com/datasets/abdallahwagih/retina-blood-vessel) dataset
-![Generated Image](./results/trues-0.png)![Generated Image](./results/trues-1.png)![Generated Image](./results/trues-2.png)
-![Generated Image](./results/trues-3.png)![Generated Image](./results/trues-4.png)![Generated Image](./results/trues-5.png)
-
+![Generated Image](./results/trues.png)
+![Generated Image](./results/sample_evolution.gif)
 
 ## Acknowledgements 🙏 
 
