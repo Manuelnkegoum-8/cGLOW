@@ -25,7 +25,23 @@ def my_postprocess(x):
     x = torch.clip(x, 0, 255)/255.
     return x
     
+def _fast_hist(label_true, label_pred, n_class):
+    mask = (label_true >= 0) & (label_true < n_class)
+    hist = np.bincount(
+        n_class * label_true[mask].astype(int) +
+        label_pred[mask].astype(int), minlength=n_class ** 2).reshape(n_class, n_class)
+    return hist
 
+def compute_iou(label_preds,label_trues,n_class):
+    label_preds = torch.mean(label_preds, dim=1, keepdim=False).cpu().numpy()
+    label_trues = torch.mean(label_trues, dim=1, keepdim=False).cpu().numpy()
+    hist = np.zeros((n_class, n_class))
+    for lt, lp in zip(label_trues, label_preds):
+        hist += _fast_hist(lt.flatten(), lp.flatten(), n_class)
+    iu = np.diag(hist) / (hist.sum(axis=1) + hist.sum(axis=0) - np.diag(hist))
+    mean_iu = np.nanmean(iu)
+
+    return mean_iu
 
 def split_feature(tensor, type="split"):
     """
@@ -41,7 +57,7 @@ def split_feature(tensor, type="split"):
 
 
 def save_model(model, optim, scheduler, dir, iteration):
-    path = os.path.join(dir, "cglow.pth.tar")
+    path = os.path.join(dir, "cglow_{}.pth.tar".format(iteration))
     state = {}
     state["iteration"] = iteration
     state["modelname"] = model.__class__.__name__
@@ -101,8 +117,7 @@ def prediction(model,device,loader,n_samples):
 
     all_samples = my_postprocess(all_samples)
     all_masks = my_postprocess(all_masks)
-    #iou = compute_iou(pred_seg,true_seg)
-    iou = .05
+    iou = compute_iou(all_samples,all_masks,2)
     # save trues and preds
     output = None
     for i in range(len(all_samples)):
@@ -177,12 +192,13 @@ class Trainer(object):
 
             if epoch%self.checkpoint==0:
                 print("[INFO] Checkpoint")
-                save_model(self.model, self.optim, self.scheduler,'checkpoints', epoch)
+                #save_model(self.model, self.optim, self.scheduler,'checkpoints', epoch)
+                torch.save(self.model.state_dict(),'checkpoint.pth')
                 output,iou = prediction(self.model,self.device,self.val_loader,10)
                 save_image(output, os.path.join(self.out_root, "step_{}.png".format(epoch)))
                 self.writer.add_scalar('Iou', iou, global_step=epoch)
-        img, *imgs = [Image.open(f) for f in sorted(glob.glob(self.fp_in),key=lambda x: int(x.split('_')[1].split('.')[0]))]
-        img.save(fp=self.fp_out, format='GIF', append_images=imgs,save_all=True, duration=500, loop=0)
+        img, *imgs = [Image.open(f) for f in sorted(glob.glob(self.fp_in))]
+        img.save(fp=self.fp_out, format='GIF', append_images=imgs,save_all=True, duration=200, loop=0)
 
 
     @torch.no_grad()
